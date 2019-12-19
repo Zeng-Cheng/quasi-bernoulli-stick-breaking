@@ -19,7 +19,7 @@ library(LaplacesDemon)
 K.true = 3
 K = 10  # original number of clusters
 N = 2000    # sample size
-y <- rnormm(N, p = c(0.3, 0.3, 0.4), mu = c(-3, 0, 4), sigma = c(1, 1, 1))
+y <- rnormm(N, p = c(0.3, 0.3, 0.4), mu = c(-3, 0, 4), sigma = c(1, 1, 1)*2)
 
 
 w = rdirichlet(1, alpha = rep(1,K))
@@ -31,6 +31,8 @@ beta
 
 mu = rnorm(K)
 sigma2 = 1/rgamma(K,2,1)
+
+hist(y,breaks = 100)
 
 ################################
 
@@ -80,7 +82,7 @@ updateSigma2<- function(C,mu){
 
 updateBeta<- function(C,u){
   n_C <- colSums(C)
-  alpha_beta = 0.1
+  alpha_beta = 1
   par1_beta = n_C + 1
   par2_beta = N - cumsum(n_C) + alpha_beta
   
@@ -97,8 +99,8 @@ updateBeta<- function(C,u){
 
 
 updateU<- function(C, beta) {
-  eps = 1E-8
-  p_u = 1E-8
+  eps = 1E-12
+  p_u = 1E-10
   n_C <- colSums(C)
   n_gtK = N - cumsum(n_C)
   
