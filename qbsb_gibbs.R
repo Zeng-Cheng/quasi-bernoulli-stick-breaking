@@ -1,3 +1,5 @@
+rm(list=ls())
+
 rtbeta <- function(n, alpha, beta, a=0, b=1)
 {
   stopifnot(n > 0 & all(beta > 0) & all(alpha > 0))
@@ -18,8 +20,8 @@ library(LaplacesDemon)
 
 K.true = 3
 K = 10  # original number of clusters
-N = 2000    # sample size
-y <- rnormm(N, p = c(0.3, 0.3, 0.4), mu = c(-3, 0, 4), sigma = c(1, 1, 1)*2)
+N = 3000    # sample size
+y <- rnormm(N, p = c(0.3, 0.3, 0.4), mu = c(-3, 0, 4), sigma = c(1, 1, 1))
 
 
 w = rdirichlet(1, alpha = rep(1,K))
@@ -80,41 +82,40 @@ updateSigma2<- function(C,mu){
   return(sigma2)
 }
 
-updateBeta<- function(C,u){
+updateBeta<- function(C,u,  eps = 1E-12){
+  
   n_C <- colSums(C)
   alpha_beta = 1
   par1_beta = n_C + 1
-  par2_beta = N - cumsum(n_C) + alpha_beta
+  par2_beta = (N - cumsum(n_C)) + alpha_beta
   
-  ubeta = rtbeta(K, par1_beta, par2_beta, a= 0, b = u)
+  beta_1 = rbeta(K, par1_beta, par2_beta)
+  beta_2 = rtbeta(K, par1_beta, par2_beta,0,eps)/eps
   
-  beta = ubeta/u
+  beta= beta_1*(u==1) + beta_2*(u!=1)
   
-  beta[K]=1E-8
+  # beta[K]=1E-8
   if(any(is.na(beta))){
-    print("beta err")
+    # print("beta err")
+    beta = updateBeta(C,u)
   }
   return(beta)
 }
 
 
-updateU<- function(C, beta) {
-  eps = 1E-12
-  p_u = 1E-10
+updateU<- function(C, beta,   eps = 1E-12) {
+  alpha_beta = 1
+  p_u = 1E-3
   n_C <- colSums(C)
   n_gtK = N - cumsum(n_C)
   
-  beta[1-beta<1E-5] = 1- 1E-5
-  beta[beta<1E-5] = 1E-5
-  
-  choice1 = log(1- p_u) + n_C* (log(eps)+log(beta))  + n_gtK* (log(1- eps*beta))
-  choice2 = log(p_u) + n_C* ( log(beta))  + n_gtK* (log(1- beta))
+  choice1 = log(p_u) 
+  choice2 = log(1-p_u) + pbeta(eps, n_C+1, alpha_beta+ n_gtK,log.p =T) - log(eps) 
   
   gumbel = -log(-log(runif(K*2,min = 0,max=1)))
   
   prob_choice = cbind(choice1,choice2)  + gumbel
-  u<- colSums((apply(prob_choice,1,function(x)x==max(x))) * c(eps,1))
-  # u[K]=1
+  u<- colSums((apply(prob_choice,1,function(x)x==max(x))) * c(1,eps))
   return(u)
 }
 
@@ -123,8 +124,7 @@ updateW<- function(u,beta){
   ubeta = u*beta
   
   w = ubeta * (cumprod(c(1, 1-ubeta))[1:K])
-  # w[K] =  w[K]+ sum(w) - 1
-  
+
   return(w)
   
 }
@@ -141,7 +141,7 @@ w<- updateW(u,beta)
 
 
 
-for (i in c(1:3000)){
+for (i in c(1:5000)){
   C<- updateC(mu,sigma2,w)
   C_label = colSums((t(C)*c(1:K)))
   n_C <- colSums(C)
@@ -153,6 +153,7 @@ for (i in c(1:3000)){
   w<- updateW(u,beta) 
   if(i %% 100==0){
     print(n_C)
+    print(sum(u))
   }
 }
 
