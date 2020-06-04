@@ -1,1 +1,1 @@
-# sparse_dirichlet
+# Code for Quasi Bernoulli Stick-breaking Process
