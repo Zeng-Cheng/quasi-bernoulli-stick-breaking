@@ -102,13 +102,13 @@ updateBeta<- function(C, b, alpha_beta = 1 ,eps   = 1E-3){
 }
 
 
-updateB<- function(C, beta,   eps=1E-3, p_b = 1E-1,alpha_beta = 1) {
+updateB<- function(C,    eps=1E-3, p_b = 1E-1,alpha_beta = 1) {
   
   n_C <- colSums(C)
-  n_gtK = N - cumsum(n_C)
+  m_C = N - cumsum(n_C)
   
   choice1 = log(p_b)
-  choice2 = log(1-p_b) + pbeta(eps, alpha_beta+ n_gtK, n_C+1, log.p =T) - alpha_beta * log(eps) 
+  choice2 = log(1-p_b) + pbeta(eps, alpha_beta+ m_C, n_C+1, log.p =T) - alpha_beta * log(eps) 
   
   gumbel = -log(-log(runif(K*2,min = 0,max=1)))
   
@@ -130,6 +130,8 @@ updateW<- function(b,beta){
 
 
 
+
+
 eps = 1/N**(1.5)
 
 C<- updateC(mu,sigma2,w)
@@ -137,22 +139,67 @@ C_label = colSums((t(C)*c(1:K)))
 n_C <- colSums(C)
 mu<- updateMu(C,sigma2)
 sigma2<- updateSigma2(C,mu)
+b<- updateB(C, eps=eps)
 beta<- updateBeta(C,b,eps = eps)
-b<- updateB(C, beta,eps=eps)
 w<- updateW(b,beta) 
 
 
 
-for (i in c(1:10000)){
+
+
+partition_prob <- function(n_C, eps=1E-3, p_b = 1E-1,alpha_beta = 1 ){
+  logsumexp<- function(x) log(sum(exp(x - max(x)))) + max(x)
+  
+  
+  m_C = N - cumsum(n_C)
+  part1 = sum(lbeta(m_C+alpha_beta, n_C+1))
+  choice1 = log(p_b)
+  choice2 = log(1-p_b) + pbeta(eps, alpha_beta+ m_C, n_C+1, log.p =T) - alpha_beta * log(eps) 
+  part2 = sum( apply(cbind(choice1,choice2),1,logsumexp))
+  
+  part1+part2
+}
+
+
+
+MH_order_idx<- function(C, eps=1E-3, p_b = 1E-1,alpha_beta = 1 ){
+  
+  n_C <- colSums(C)
+  
+  idx_prop = order(n_C, decreasing = T)
+  n_C_prop = n_C[idx_prop]
+  
+  if (log(runif(1)< (partition_prob(n_C) - partition_prob(n_C_prop)))){
+    idx = idx_prop
+  }else{
+    idx= c(1:K)
+  }
+  
+  idx
+}
+
+
+for (i in c(1:5000)){
   
   C<- updateC(mu,sigma2,w)
   C_label = colSums((t(C)*c(1:K)))
   n_C <- colSums(C)
   mu<- updateMu(C,sigma2)
   sigma2<- updateSigma2(C,mu)
+  b<- updateB(C, eps=eps)
   beta<- updateBeta(C,b,eps = eps)
-  b<- updateB(C, beta,eps=eps)
   w<- updateW(b,beta) 
+  
+  # MH step to re-order components
+  {
+  idx = MH_order_idx(C,eps,p_b,alpha_beta)
+  mu = mu[idx]
+  sigma2 = sigma2[idx]
+  C = C[,idx]
+  b<- updateB(C, eps=eps)
+  beta<- updateBeta(C,b,eps = eps)
+  w<- updateW(b,beta) 
+  }
   
   if(i %% 100==0){
     print(n_C)
