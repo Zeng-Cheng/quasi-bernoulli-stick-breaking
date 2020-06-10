@@ -169,7 +169,7 @@ MH_order_idx<- function(C, eps=1E-3, p_b = 1E-1,alpha_beta = 1 ){
   idx_prop = order(n_C, decreasing = T)
   n_C_prop = n_C[idx_prop]
   
-  if (log(runif(1)< (partition_prob(n_C) - partition_prob(n_C_prop)))){
+  if (log(runif(1))< (partition_prob(n_C) - partition_prob(n_C_prop))){
     idx = idx_prop
   }else{
     idx= c(1:K)
