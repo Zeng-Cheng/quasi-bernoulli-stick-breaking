@@ -12,68 +12,92 @@ rtbeta <- function(n, alpha, beta, a = 0, b = 1) {
 w = rdirichlet(1, alpha = rep(1, K))
 # b = rep(1,K)
 
-eps <- 1 / N ^ 1.1
+eps <- 1 / (N ^ 1.01)
 p_b = 0.9
 
 ################################
 
 
-updateC <- function(mu, sigma2, w) {
-  diff2 = (outer(mu, y, "-")) ** 2
-  diff2_sigma2 = diff2 / sigma2
-  loglik_normal = -diff2_sigma2 / 2 - log(sigma2) / 2
+
+
+updateC <- function(mu, SigmasInv, w) {
   
-  # K = length(w)
-  # N = length(y)
-  loglik = t(loglik_normal + log(c(w)))
+  loglik_normal = matrix(0,N,K)
+  
+  for(k in c(1:K)){
+    diff = y - rep(mu[k,],each=N)
+    logdet1 = logdet(SigmasInv[,,k])
+    loglik_normal[,k] = -diag(diff%*%SigmasInv[,,k]%*%t(diff))/2 + logdet1/2
+  }
+  
+  loglik = t( t(loglik_normal) + log(c(w))) # R is adding by columns, so I used tranpose's twice 
   gumbel = -log(-log(runif(N * K, min = 0, max = 1)))
   C <- t(apply(loglik + gumbel, 1, function(x) { x == max(x) }))
   return(C)
 }
 
 
-
-updateMu <- function(C, sigma2, mu_prior_mean = 0, mu_prior_sigma2 = 1) {
+updateMu <- function(C, SigmasInv, mu_prior_mean = 0, mu_prior_sigma2 = 1) {
   
-  # K = dim(C)[2]
-  m_var = 1 / (colSums(C) / sigma2 + 1 / mu_prior_sigma2)
-  m_part2 = c(y %*% C / sigma2 + mu_prior_mean / mu_prior_sigma2)
-  m_mean = m_var * m_part2
+  ySum = t(C)%*%y
+  n_C = colSums(C)
   
-  mu = rnorm(K, m_mean, sqrt(m_var))
+  for(k in c(1:K)){
+    m_part2 = ySum[k,]%*%SigmasInv[,,k]+ mu_prior_mean / mu_prior_sigma2
+    
+    m_var = solve(SigmasInv[,,k]*n_C[k] + diag(1,p)/mu_prior_sigma2)
+    m_mean = m_var%*%t(m_part2)
+    
+    mu[k,] = t(chol(m_var)) %*%rnorm(p) + m_mean
+  }
+  
   
   return(mu)
 }
 
 
-updateSigma2 <- function(C, mu, sigma2_prior_par1 = 2, sigma_prior_par2 = 1) {
+updateSigmasInv <- function(C, mu) {
   
   C_label = colSums((t(C) * c(1:K)))
   
-  par1_ig = colSums(C) / 2 + sigma2_prior_par1
-  par2_ig = c(((y - mu[C_label]) ** 2) %*% C) / 2 + sigma_prior_par2
+  diff = (y- mu[C_label,])
   
-  sigma2 = 1 / rgamma(K, par1_ig, rate = par2_ig)
-  
-  if (any(is.na(sigma2))) {
-    sigma2 = par2_ig / par1_ig
+  for(k in c(1:K)){
+    pick = (C_label==k)
+    
+    if(sum(pick)>1){
+      par2 = solve( t(diff[pick,])%*% (diff[pick,])+ diag(p))
+    }
+    
+    if(sum(pick)==1){
+      vec = matrix(diff[pick,],1,p)
+      par2 = solve( t(vec)%*% (vec)+ diag(p))
+    }
+    if(sum(pick)==0){
+      par2 =  diag(p)
+    }
+    
+    par2 = (par2+t(par2))/2
+    par1 = sum(C_label==k) + p
+    
+    SigmasInv[,,k] = rwishart(par1,par2)
   }
   
-  return(sigma2)
+  return(SigmasInv)
 }
 
-updateBeta_sigma2 <- function(sigma2, sigma2_prior_par1 = 2, beta_sigma2_prior_par1 = 0.2, beta_sigma2_prior_par2 = 10) {
-  
-  par1_gamma <- K * sigma2_prior_par1 + beta_sigma2_prior_par1
-  par2_gamma <- beta_sigma2_prior_par2 + sum(1 / sigma2)
-  
-  beta_sigma2 <- rgamma(1, par1_gamma, rate = par2_gamma)
-  
-  if(any(is.na(beta_sigma2))) {
-    beta_sigma2 = par1_gamma / par2_gamma
-  }
-  return(beta_sigma2)
-}
+# updateBeta_sigma2 <- function(sigma2, sigma2_prior_par1 = 2, beta_sigma2_prior_par1 = 0.2, beta_sigma2_prior_par2 = 10) {
+#   
+#   par1_gamma <- K * sigma2_prior_par1 + beta_sigma2_prior_par1
+#   par2_gamma <- beta_sigma2_prior_par2 + sum(1 / sigma2)
+#   
+#   beta_sigma2 <- rgamma(1, par1_gamma, rate = par2_gamma)
+#   
+#   if(any(is.na(beta_sigma2))) {
+#     beta_sigma2 = par1_gamma / par2_gamma
+#   }
+#   return(beta_sigma2)
+# }
 
 updateBeta <- function(C, b, alpha_beta = 1, eps = 1E-3) {
   # N = dim(C)[1]
