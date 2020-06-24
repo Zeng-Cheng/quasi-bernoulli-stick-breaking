@@ -36,7 +36,7 @@ for (i in 1:10000){
   C <- updateC(mu, sigma2, w)
   # C_label = colSums((t(C) * c(1:K)))
   n_C <- colSums(C)
-  # mu <- updateMu(C, sigma2, mu_prior_mean = (max(y) - min(y)) / 2, mu_prior_sigma2 = (max(y) - min(y)) ^ 2)
+  # mu <- updateMu(C, sigma2, mu_prior_mean = (max(y) + min(y)) / 2, mu_prior_sigma2 = (max(y) - min(y)) ^ 2)
   beta_sigma2 <- updateBeta_sigma2(sigma2, sigma2_prior_par1 = 2, beta_sigma2_prior_par1 = 0.2, beta_sigma2_prior_par2 = 10 / (max(y) - min(y)) ^ 2)
   sigma2 <- updateSigma2(C, mu, sigma2_prior_par1 = 2, sigma_prior_par2 = beta_sigma2)
   # b <- updateB(C, eps = eps, p_b = p_b)
