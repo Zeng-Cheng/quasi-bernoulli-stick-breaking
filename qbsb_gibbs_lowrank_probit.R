@@ -1,19 +1,18 @@
 
-require("LaplacesDemon")
-require("rstiefel")
-require("msm")
-require("truncnorm")
+require("LaplacesDemon") # rdirichlet
+require("rstiefel") # rbing.matrix.gibbs
+require("truncnorm") # rtruncnorm
 
 runQBSBProbitLowrank <- function(
-    A, v, d, steps = 1000, burnins = 200, K = 25,
+    A, v, d, steps = 5000, burnins = 1000, K = 30,
     p_b = 0.9, d_beta = 0, alpha_beta = 1, eps = 1e-3,
-    D_prior_mu = 0, D_prior_sigma2 = 100, tau = 10
+    D_prior_mu = 0, D_prior_sigma2 = 0.1, tau = 10
     ) {
     
-    # A[is.na(A)] <- TRUE
+    # v is the original dimension of the matrix form by each row A[s, ]
 
     N = nrow(A)
-    p = ncol(A) # number of elements of lower triangle matrix
+    p = ncol(A) # number of elements of the lower triangle matrix of v * v
 
     rtbeta <- function(n, alpha, beta, a = 0, b = 1) {
             stopifnot(n > 0 & all(beta > 0) & all(alpha > 0))
@@ -60,14 +59,14 @@ runQBSBProbitLowrank <- function(
             Q[, , k] <- rbing.matrix.gibbs(
                 apply(Z[, , C[, k]], c(1, 2), sum) / 2 - D * n_C[k] / 2,
                 diag(Lambda[k, sorted_idx]),
-                Q[, , k])
+                Q[, sorted_idx, k])
             Q[, , k]<- Q[, rev_idx, k]
         }
         return(Q)
     }
 
 
-    updateLambda <- function(C, Z, Q, D, tau = 1) {
+    updateLambda <- function(C, Z, Q, D) {
         n_C <- colSums(C)
         for(k in 1:K) {
             m_var <- 1 / (n_C[k] / 2 + 1 / tau ^ 2)
@@ -78,7 +77,7 @@ runQBSBProbitLowrank <- function(
     }
 
 
-    updateD <- function(C, Z, M, D_prior_mu, D_prior_sigma2) {
+    updateD <- function(C, Z, M) {
 
         C_label = colSums((t(C) * c(1:K)))
         diff = Z - M[, , C_label]
@@ -139,7 +138,7 @@ runQBSBProbitLowrank <- function(
         return(M)
     }
 
-    updateBeta <- function(C, b, alpha_beta = 1, eps = 1E-3, d_beta = 0) {
+    updateBeta <- function(C, b) {
 
         n_C <- colSums(C)
         par1_beta = (N - cumsum(n_C)) + alpha_beta + d_beta * c(1:K)
@@ -166,7 +165,7 @@ runQBSBProbitLowrank <- function(
     }
 
 
-    updateB <- function(C, eps = 1E-3, p_b = 0.9, alpha_beta = 1) {
+    updateB <- function(C) {
 
         n_C <- colSums(C)
         m_C = N - cumsum(n_C)
@@ -185,35 +184,6 @@ runQBSBProbitLowrank <- function(
         v = 1 - b * beta
         w = v * (cumprod(c(1, 1 - v))[1:K])
         return(w)
-    }
-
-
-    partition_prob <- function(n_C, eps = 1E-3, p_b = 0.9, alpha_beta = 1, d_beta = 0) {
-        logsumexp <- function(x) log(sum(exp(x - max(x)))) + max(x)
-        
-        m_C = N - cumsum(n_C)
-        part1 = sum(lbeta(m_C + alpha_beta + d_beta * c(1:K), n_C + 1 - d_beta))
-        if (p_b == 1) return(part1)
-
-        choice1 = log(p_b)
-        choice2 = log(1 - p_b) + pbeta(eps, alpha_beta + m_C, n_C + 1, log.p = T) - alpha_beta * log(eps) 
-        part2 = sum(apply(cbind(choice1, choice2), 1, logsumexp))
-        return(part1 + part2)
-    }
-
-
-    MH_order_idx <- function(C, eps = 1E-3, p_b = 0.9, alpha_beta = 1, d_beta = 0) {
-        n_C <- colSums(C)
-        idx_prop = order(n_C, decreasing = T)
-        n_C_prop = n_C[idx_prop]
-        
-        if (log(runif(1)) < (partition_prob(n_C_prop, eps, p_b, alpha_beta, d_beta) - partition_prob(n_C, eps, p_b, alpha_beta, d_beta))) {
-            idx = idx_prop
-        }
-        else {
-            idx = c(1:K)
-        }
-        return(idx)
     }
         
 
@@ -247,29 +217,32 @@ runQBSBProbitLowrank <- function(
     trace_label = list()
     trace_D = list()
 
-    for (i in 1:steps) {
-
-        C_label = colSums((t(C) * c(1:K)))
-        n_C <- colSums(C)
+    for (i in 1:steps) { 
 
         M <- updateM(Q, Lambda)
         Z <- updateZ(C, M, D)
         
         Q <- updateQ(C, Z, D, Lambda)
-        Lambda <- updateLambda(C, Z, Q, D, tau = tau)
-        D <- updateD(C, Z, M, D_prior_mu, D_prior_sigma2)
+        Lambda <- updateLambda(C, Z, Q, D)
+        D <- updateD(C, Z, M)
 
-        # MH step to re-order components
-        idx = MH_order_idx(C, eps = eps, p_b = p_b, alpha_beta = alpha_beta, d_beta = d_beta)
-
-        M = M[, , idx]
-        Lambda = Lambda[idx, ]
-        Q = Q[, , idx]
-        C = C[, idx]
+        if(i < 50) {
+            n_C <- colSums(C)
+            idx = order(n_C, decreasing = T)
+            # re-order components to find a good start point for MCMC
+            M = M[, , idx]
+            Lambda = Lambda[idx, ]
+            Q = Q[, , idx]
+            C = C[, idx]
+        }
          
-        if (p_b < 1) b <- updateB(C, eps = eps, p_b = p_b, alpha_beta = alpha_beta)
-        beta <- updateBeta(C, b, alpha_beta = alpha_beta, d_beta = d_beta, eps = eps)
+        if (p_b < 1) b <- updateB(C)
+        beta <- updateBeta(C, b)
         w <- updateW(b, beta)
+
+        C = updateC(M, D, w)
+        C_label = colSums((t(C) * c(1:K)))
+        n_C <- colSums(C)
 
         if (i > burnins) {
             idx = i - burnins
@@ -278,9 +251,8 @@ runQBSBProbitLowrank <- function(
             trace_label[[idx]] = C_label
             trace_D[[idx]] = D
         }
-        # print(n_C)
-        # print(i)
-        C = updateC(M, D, w)
+        
+        if(i %% 5 == 0) {print(n_C); print(i)}       
     }
     
     return(list(M = trace_M, nC = trace_nC, label = trace_label, D = trace_D))

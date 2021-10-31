@@ -1,7 +1,7 @@
 require("LaplacesDemon")
 
 runQBSBUvGaussian <- function(
-    y, steps = 2E4, burnins = 1E4, K = 20,
+    y, steps = 5E4, burnins = 3E4, K = 40,
     p_b = 0.9, d_beta = 0, alpha_beta = 1, eps = 1e-3,
     mu_prior_mean = (max(y) + min(y)) / 2, mu_prior_sigma2 = (max(y) - min(y)) ^ 2, sigma2_prior_par1 = 2,
     beta_sigma2_prior_par1 = 0.2, beta_sigma2_prior_par2 = 10 / (max(y) - min(y)) ^ 2
@@ -33,7 +33,7 @@ runQBSBUvGaussian <- function(
         return(C)
     }
     
-    updateMu <- function(C, sigma2, mu_prior_mean = 0, mu_prior_sigma2 = 1) {
+    updateMu <- function(C, sigma2) {
         
         m_var = 1 / (colSums(C) / sigma2 + 1 / mu_prior_sigma2)
         m_part2 = c(y %*% C / sigma2 + mu_prior_mean / mu_prior_sigma2)
@@ -44,7 +44,7 @@ runQBSBUvGaussian <- function(
         return(mu)
     }
        
-    updateSigma2 <- function(C, mu, sigma2_prior_par1 = 2, sigma2_prior_par2 = 1) {
+    updateSigma2 <- function(C, mu, sigma2_prior_par2 = 1) {
         
         C_label = colSums((t(C) * c(1:K)))       
         par1_ig = colSums(C) / 2 + sigma2_prior_par1
@@ -58,7 +58,7 @@ runQBSBUvGaussian <- function(
         return(sigma2)
     }
     
-    updateBeta_sigma2 <- function(sigma2, sigma2_prior_par1 = 2, beta_sigma2_prior_par1 = 0.2, beta_sigma2_prior_par2 = 10) {
+    updateBeta_sigma2 <- function(sigma2) {
         
         par1_gamma <- K * sigma2_prior_par1 + beta_sigma2_prior_par1
         par2_gamma <- beta_sigma2_prior_par2 + sum(1 / sigma2)
@@ -71,7 +71,7 @@ runQBSBUvGaussian <- function(
         return(beta_sigma2)
     }
     
-    updateBeta <- function(C, b, alpha_beta = 1, eps = 1E-3, d_beta = 0) {
+    updateBeta <- function(C, b) {
 
         n_C <- colSums(C)
         par1_beta = (N - cumsum(n_C)) + alpha_beta + d_beta * c(1:K)
@@ -98,7 +98,7 @@ runQBSBUvGaussian <- function(
     }
     
     
-    updateB <- function(C, eps = 1E-3, p_b = 0.9, alpha_beta = 1) {
+    updateB <- function(C) {
         
         n_C <- colSums(C)
         m_C = N - cumsum(n_C)
@@ -119,44 +119,16 @@ runQBSBUvGaussian <- function(
         return(w)
     }
     
-    
-    partition_prob <- function(n_C, eps = 1E-3, p_b = 0.9, alpha_beta = 1, d_beta = 0) {
-        logsumexp <- function(x) log(sum(exp(x - max(x)))) + max(x)
-        
-        m_C = N - cumsum(n_C)
-        part1 = sum(lbeta(m_C + alpha_beta + d_beta * c(1:K), n_C + 1 - d_beta))
-        if (p_b == 1) return(part1)
-
-        choice1 = log(p_b)
-        choice2 = log(1 - p_b) + pbeta(eps, alpha_beta + m_C, n_C + 1, log.p = T) - alpha_beta * log(eps) 
-        part2 = sum(apply(cbind(choice1, choice2), 1, logsumexp))
-        return(part1 + part2)
-    }
-    
-    
-    MH_order_idx <- function(C, eps = 1E-3, p_b = 0.9, alpha_beta = 1, d_beta = 0) {
-        n_C <- colSums(C)
-        idx_prop = order(n_C, decreasing = T)
-        n_C_prop = n_C[idx_prop]
-        
-        if (log(runif(1)) < (partition_prob(n_C_prop, eps, p_b, alpha_beta, d_beta) - partition_prob(n_C, eps, p_b, alpha_beta, d_beta))) {
-            idx = idx_prop
-        }
-        else {
-            idx = c(1:K)
-        }
-        return(idx)
-    }
-    
     # initialize the parameters
     mu = rep(0,K)
     sigma2 = 1 / rgamma(K, 2, 1)
+    beta_sigma2 = 1
     w = rdirichlet(1, alpha = rep(1, K))
     b = rep(1, K)
 
     # record trace
     trace_mu = list()
-    trace_sigmas_inv = list() 
+    trace_sigma2 = list() 
     trace_nC = list()
     trace_label = list()
     trace_b = list()
@@ -166,28 +138,24 @@ runQBSBUvGaussian <- function(
         C <- updateC(mu, sigma2, w)
         C_label = colSums((t(C) * c(1:K)))
         n_C <- colSums(C)
-        mu <- updateMu(C, sigma2, mu_prior_mean = mu_prior_mean, mu_prior_sigma2 = mu_prior_sigma2)
-        beta_sigma2 <- updateBeta_sigma2(sigma2, sigma2_prior_par1 = sigma2_prior_par1, beta_sigma2_prior_par1 = beta_sigma2_prior_par1, beta_sigma2_prior_par2 = beta_sigma2_prior_par2)
-        sigma2 <- updateSigma2(C, mu, sigma2_prior_par1 = sigma2_prior_par1, sigma2_prior_par2 = beta_sigma2)
+        mu <- updateMu(C, sigma2)       
+        sigma2 <- updateSigma2(C, mu, sigma2_prior_par2 = beta_sigma2)
+        beta_sigma2 <- updateBeta_sigma2(sigma2)
            
-        # MH step to re-order components
-        idx = MH_order_idx(C, eps = eps, p_b = p_b, alpha_beta = alpha_beta, d_beta = d_beta)
-        mu = mu[idx]
-        sigma2 = sigma2[idx]
-        C = C[, idx]
-        if (p_b < 1) b <- updateB(C, eps = eps, p_b = p_b, alpha_beta = alpha_beta)
-        beta <- updateBeta(C, b, alpha_beta = alpha_beta, d_beta = d_beta, eps = eps)
+        if (p_b < 1) b <- updateB(C)
+        beta <- updateBeta(C, b)
         w <- updateW(b, beta)
         
         if (i > burnins) {
             idx = i - burnins
             trace_mu[[idx]] = mu
             trace_b[[idx]] = b
-            trace_sigmas_inv[[idx]] = sigma2
+            trace_sigma2[[idx]] = sigma2
             trace_nC[[idx]] = n_C
-            # trace_label[[idx]] = C_label
+            trace_label[[idx]] = C_label
         }
-    }
-    info = data.frame(K = K, p_b = p_b, eps = eps, alpha_beta = alpha_beta, d_beta = d_beta)    
-    return(list(info = info, mu = trace_mu, b = trace_b, SigmasInv = trace_sigmas_inv, nC = trace_nC, label = trace_label))  
+
+        if(i %% 2000 == 0) print(n_C)
+    } 
+    return(list(mu = trace_mu, b = trace_b, Sigma2 = trace_sigma2, nC = trace_nC, label = trace_label))  
 }

@@ -2,7 +2,7 @@ require("LaplacesDemon")
 require("msm")
 
 runQBSBUvLaplace <- function(
-    y, steps = 2E4, burnins = 1E4, K = 20,
+    y, steps = 5E4, burnins = 3E4, K = 40,
     p_b = 0.9, d_beta = 0, alpha_beta = 1, eps = 1e-3,
     mu_prior_mean = (max(y) + min(y)) / 2, mu_prior_sigma2 = (max(y) - min(y)) ^ 2,
     lambda_prior_par1 = 2, lambda_prior_par2 = 1
@@ -34,7 +34,7 @@ runQBSBUvLaplace <- function(
         return(C)
     }
     
-    updateMu <- function(C, lambda, mu_prior_mean = 0, mu_prior_sigma2 = 0.1) {
+    updateMu <- function(C, lambda) {
         
         for(k in 1:K) {
             x <- sort(y[C[, k]])
@@ -57,7 +57,7 @@ runQBSBUvLaplace <- function(
         return(mu)
     }
        
-    updateLambda <- function(C, mu, lambda_prior_par1 = 2, lambda_prior_par2 = 1) {
+    updateLambda <- function(C, mu) {
         
         C_label = colSums((t(C) * c(1:K)))       
         par1_ig = colSums(C) + lambda_prior_par1
@@ -72,7 +72,7 @@ runQBSBUvLaplace <- function(
     }
     
     
-    updateBeta <- function(C, b, alpha_beta = 1, eps = 1E-3, d_beta = 0) {
+    updateBeta <- function(C, b) {
 
         n_C <- colSums(C)
         par1_beta = (N - cumsum(n_C)) + alpha_beta + d_beta * c(1:K)
@@ -99,7 +99,7 @@ runQBSBUvLaplace <- function(
     }
     
     
-    updateB <- function(C, eps = 1E-3, p_b = 0.9, alpha_beta = 1) {
+    updateB <- function(C) {
         
         n_C <- colSums(C)
         m_C = N - cumsum(n_C)
@@ -120,35 +120,7 @@ runQBSBUvLaplace <- function(
         return(w)
     }
     
-    
-    partition_prob <- function(n_C, eps = 1E-3, p_b = 0.9, alpha_beta = 1, d_beta = 0) {
-        logsumexp <- function(x) log(sum(exp(x - max(x)))) + max(x)
-        
-        m_C = N - cumsum(n_C)
-        part1 = sum(lbeta(m_C + alpha_beta + d_beta * c(1:K), n_C + 1 - d_beta))
-        if (p_b == 1) return(part1)
 
-        choice1 = log(p_b)
-        choice2 = log(1 - p_b) + pbeta(eps, alpha_beta + m_C, n_C + 1, log.p = T) - alpha_beta * log(eps) 
-        part2 = sum(apply(cbind(choice1, choice2), 1, logsumexp))
-        return(part1 + part2)
-    }
-    
-    
-    MH_order_idx <- function(C, eps = 1E-3, p_b = 0.9, alpha_beta = 1, d_beta = 0) {
-        n_C <- colSums(C)
-        idx_prop = order(n_C, decreasing = T)
-        n_C_prop = n_C[idx_prop]
-        
-        if (log(runif(1)) < (partition_prob(n_C_prop, eps, p_b, alpha_beta, d_beta) - partition_prob(n_C, eps, p_b, alpha_beta, d_beta))) {
-            idx = idx_prop
-        }
-        else {
-            idx = c(1:K)
-        }
-        return(idx)
-    }
-    
     # initialize the parameters
     mu = rep(0, K)
     lambda = 1 / rgamma(K, 2, 1)
@@ -167,16 +139,11 @@ runQBSBUvLaplace <- function(
         C <- updateC(mu, lambda, w)
         C_label = colSums((t(C) * c(1:K)))
         n_C <- colSums(C)
-        mu <- updateMu(C, lambda, mu_prior_mean = mu_prior_mean, mu_prior_sigma2 = mu_prior_sigma2)
-        lambda <- updateLambda(C, mu, lambda_prior_par1 = lambda_prior_par1, lambda_prior_par2 = lambda_prior_par2)
-           
-        # MH step to re-order components
-        idx = MH_order_idx(C, eps = eps, p_b = p_b, alpha_beta = alpha_beta, d_beta = d_beta)
-        mu = mu[idx]
-        lambda = lambda[idx]
-        C = C[, idx]
-        if (p_b < 1) b <- updateB(C, eps = eps, p_b = p_b, alpha_beta = alpha_beta)
-        beta <- updateBeta(C, b, alpha_beta = alpha_beta, d_beta = d_beta, eps = eps)
+        mu <- updateMu(C, lambda)
+        lambda <- updateLambda(C, mu)
+        
+        if (p_b < 1) b <- updateB(C)
+        beta <- updateBeta(C, b)
         w <- updateW(b, beta)
         
         if (i > burnins) {
@@ -185,11 +152,10 @@ runQBSBUvLaplace <- function(
             trace_b[[idx]] = b
             trace_lambda[[idx]] = lambda
             trace_nC[[idx]] = n_C
-            # trace_label[[idx]] = C_label
+            trace_label[[idx]] = C_label
         }
 
-        # if(i %% 10 == 0) print(n_C)
+        if(i %% 500 == 0) print(n_C)
     }
-    info = data.frame(K = K, p_b = p_b, eps = eps, alpha_beta = alpha_beta, d_beta = d_beta)    
-    return(list(info = info, mu = trace_mu, b = trace_b, lambda = trace_lambda, nC = trace_nC, label = trace_label))  
+    return(list(mu = trace_mu, b = trace_b, lambda = trace_lambda, nC = trace_nC, label = trace_label))  
 }
