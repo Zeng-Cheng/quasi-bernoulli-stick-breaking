@@ -4,13 +4,13 @@ This repo uses R for Bayesian posterior computation for the quasi-Bernoulli stic
 
 The QBSB mixture model has the following form:
 $$\begin{align}
-     Y_i \mid c_i,{\theta} & \sim \mathcal{F}(\theta_{c_i})\text{ independently for } 			i=1,\dots,n,\\
+     Y_i \mid c_i,{\theta} & \sim \mathcal{F}(\theta_{c_i})\text{ independently for } 			i=1,\dots,n, \\\\\\
      c_1,\dots,c_n \mid {w} & \sim \text{Categorical}({w}) \text{ i.i.d.},\\
-	 \theta_1,\theta_2,\ldots & \sim \mathcal{G} \text{ i.i.d.},\\
-      w_1 & = v_1, \ w_k = v_k\prod_{l=1}^{k-1} (1-v_l), \text{ for } k\geq 2, \\
-      v_k & = 1- b_k\beta_k ,\\
-      b_k & \sim p\delta_1(\cdot) + (1-p) \delta_\epsilon(\cdot),\\
-      \beta_k & \sim  \text{Beta}(\alpha, 1).\\
+	 \theta_1,\theta_2,\ldots & \sim \mathcal{G} \text{ i.i.d.},\\\\\\
+      w_1 & = v_1, \ w_k = v_k\prod_{l=1}^{k-1} (1-v_l), \text{ for } k\geq 2, \\\\\\
+      v_k & = 1- b_k\beta_k ,\\\\\\
+      b_k & \sim p\delta_1(\cdot) + (1-p) \delta_\epsilon(\cdot),\\\\\\
+      \beta_k & \sim  \text{Beta}(\alpha, 1).
 \end{align}$$
 The $\mathcal{G}$ is the base measure or, in other word, the prior given to the parameter $\theta$ of the component distribution. The following component distributions $\mathcal{F}$ are implemented:
 
