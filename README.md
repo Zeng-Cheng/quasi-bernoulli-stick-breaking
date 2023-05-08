@@ -7,7 +7,7 @@ The QBSB mixture model has the following form:
 $$
 \begin{align}
      Y_i \mid c_i,{\theta} & \sim \mathcal{F}(\theta_{c_i})\mbox{ independently for } 			i=1,\dots,n, \\
-     c_1,\dots,c_n \mid {w} & \sim \mbox{Categorical}({w}) \mbox{ i.i.d.},\\
+     c_i \mid {w} & \stackrel{\text{i.i.d.}}{\sim} \mbox{Categorical}({w}) \mbox{ i.i.d.},\\
 	 \theta_1,\theta_2,\ldots & \sim \mathcal{G} \mbox{ i.i.d.},\\
       w_1 & = v_1, \ w_k = v_k\prod_{l=1}^{k-1} (1-v_l), \mbox{ for } k\geq 2, \\
       v_k & = 1- b_k\beta_k ,\\
