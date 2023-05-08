@@ -6,13 +6,13 @@ The QBSB mixture model has the following form:
 
 $$
 \begin{align}
-     Y_i \mid c_i,{\theta} & \sim \mathcal{F}(\theta_{c_i})\mbox{ independently for } 			i=1,\dots,n, \\
-     c_i \mid {w} & \stackrel{\text{i.i.d.}}{\sim} \mbox{Categorical}({w}) \mbox{ i.i.d.},\\
-	 \theta_1,\theta_2,\ldots & \sim \mathcal{G} \mbox{ i.i.d.},\\
-      w_1 & = v_1, \ w_k = v_k\prod_{l=1}^{k-1} (1-v_l), \mbox{ for } k\geq 2, \\
+     Y_i \mid c_i,{\theta} & \stackrel{indep}{\sim} \mathcal{F}(\theta_{c_i})\text{ for } 			i=1,\dots,n, \\
+     c_i \mid {w} & \stackrel{iid}{\sim} \text{Categorical}({w}) ,\\
+	 \theta_k & \stackrel{iid}{\sim} \mathcal{G} \text{ for } k\geq 1,\\
+      w_1 & = v_1, \ w_k = v_k\prod_{l=1}^{k-1} (1-v_l), \text{ for } k\geq 2, \\
       v_k & = 1- b_k\beta_k ,\\
-      b_k & \sim p\delta_1(\cdot) + (1-p) \delta_\epsilon(\cdot),\\
-      \beta_k & \sim  \mbox{Beta}(\alpha, 1).
+      b_k & \stackrel{iid}{\sim} \tilde{p}\delta_1(\cdot) + (1-\tilde{p}) \delta_\epsilon(\cdot),\\
+      \beta_k & \stackrel{iid}{\sim}  \text{Beta}(\alpha, 1).
 \end{align}
 $$
 
