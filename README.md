@@ -6,7 +6,7 @@ The quasi-Bernoulli mixture model has the following form:
 
 $$
 \begin{align}
-     Y_i \mid c_i,{\theta} & \stackrel{indep}{\sim} \mathcal{F}(\theta_{c_i})\text{ for } 			i=1,\dots,n, \\
+     y_i \mid c_i,{\theta} & \stackrel{indep}{\sim} \mathcal{F}(\theta_{c_i})\text{ for } 			i=1,\dots,n, \\
      c_i \mid {w} & \stackrel{iid}{\sim} \text{Categorical}({w}) ,\\
 	 \theta_k & \stackrel{iid}{\sim} \mathcal{G} \text{ for } k\geq 1,\\
       w_1 & = v_1, \ w_k = v_k\prod_{l=1}^{k-1} (1-v_l), \text{ for } k\geq 2, \\
