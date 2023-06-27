@@ -1,6 +1,6 @@
 # Quasi-Bernoulli Stick-breaking Process Mixture Model
 
-This repo uses R for Bayesian posterior computation for the quasi-Bernoulli stick-breaking process mixture model, which is proposed by the paper *Consistent Model-based Clustering using the Quasi-Bernoulli Stick-Breaking Process* ([arXiv: 2008.09938](https://arxiv.org/abs/2008.09938)). We refer to this model as a quasi-Bernoulli mixture model. Since the Dirichlet process is a special case of the QBSB process, the functions in this repo can also be used for posterior computation for the Dirichlet process mixture model. In addition, using some parameters, the functions can implement MCMC for the Pitman-Yor process mixture model.
+This repo uses R for Bayesian posterior computation for the quasi-Bernoulli stick-breaking process mixture model, which is proposed by the paper *Consistent Model-based Clustering using the Quasi-Bernoulli Stick-Breaking Process* ([Zeng et al., 2023](https://www.jmlr.org/papers/volume24/22-0436/22-0436.pdf)). We refer to this model as a quasi-Bernoulli mixture model. Since the Dirichlet process is a special case of the QBSB process, the functions in this repo can also be used for posterior computation for the Dirichlet process mixture model. In addition, using some parameters, the functions can implement MCMC for the Pitman-Yor process mixture model.
 
 The quasi-Bernoulli mixture model has the following form:
 
@@ -70,3 +70,8 @@ These functions return the Markov chains of the posterior sampling of the parame
 | efficiency_mcmc_mv.R       | 8           |
 | sim_uv_normal_additional.R | 9           |
 
+
+
+### References
+
+Cheng Zeng, Jeffrey W Miller and Leo L Duan. Consistent Model-based Clustering using the Quasi-Bernoulli Stick-breaking Process. *Journal of Machine Learning Research*, 24(153):1--32, 2023.
